@@ -68,7 +68,6 @@ func round(d time.Duration) time.Duration {
 // Globals for state management
 var CurrentRate RateDescriptor
 var CurrentMetrics vegeta.Metrics
-var CurrentRateSetAt time.Time
 
 // Pace determines the length of time to sleep until the next hit is sent.
 func (vrp VariableRatePacer) Pace(elapsed time.Duration, hits uint64) (time.Duration, bool) {
@@ -100,7 +99,6 @@ func (vrp VariableRatePacer) Pace(elapsed time.Duration, hits uint64) (time.Dura
 		}
 
 		CurrentRate = activeRate
-		CurrentRateSetAt = time.Now()
 		elapsedSummary := func() string {
 			if uint64(elapsed.Seconds()) > 0 {
 				return fmt.Sprintf(" (%v elapsed)", round(elapsed))
@@ -174,9 +172,7 @@ func main() {
 	attacker := vegeta.NewAttacker()
 	startedAt := time.Now()
 	for res := range attacker.Attack(targeter, pacer, attack.Duration(), attack.Name) {
-		if res.Timestamp.After(CurrentRateSetAt) {
-			CurrentMetrics.Add(res)
-		}
+		CurrentMetrics.Add(res)
 	}
 
 	CurrentMetrics.Close()
