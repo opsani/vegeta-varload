@@ -11,7 +11,7 @@ This code was adapted from a 2017 article on Josh Barrats blog: https://serializ
 
 ```console
 $ go run vegeta-varload.go https://www.opsani.com/
-🚀  Start variable load test against https://golang.org/ with 6 load profiles for 44 total seconds
+🚀  Starting variable load test against https://www.opsani.com/ with 6 load profiles for 44 total seconds
 💥  Attacking at rate of 10 req/sec for 5s
 Requests      [total, rate, throughput]         59, 9.99, 9.87
 Duration      [total, attack, wait]             5.977s, 5.904s, 73.411ms
@@ -66,7 +66,7 @@ Bytes Out     [total, mean]                     0, 0.00
 Success       [ratio]                           100.00%
 Status Codes  [code:count]                      200:844
 Error Set:
-✨  Attack completed in 44.073s
+✨  Variable load test against https://www.opsani.com/ completed in 44.073s
 ```
 
 ## Building & Running on macOS
