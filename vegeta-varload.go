@@ -41,6 +41,26 @@ func (mrp MultiRatePacer) String() string {
 	return fmt.Sprintf("Multi Rate{%s: %d rates}", mrp.Attack.Name, len(mrp.Attack.Rates))
 }
 
+// Rounding support lifted from Vegeta reporters since it is private
+var durations = [...]time.Duration{
+	time.Hour,
+	time.Minute,
+	time.Second,
+	time.Millisecond,
+	time.Microsecond,
+	time.Nanosecond,
+}
+
+// round to the next most precise unit
+func round(d time.Duration) time.Duration {
+	for i, unit := range durations {
+		if d >= unit && i < len(durations)-1 {
+			return d.Round(durations[i+1])
+		}
+	}
+	return d
+}
+
 // Globals for state management
 var CurrentRate RateDescriptor
 var CurrentMetrics vegeta.Metrics
@@ -78,7 +98,7 @@ func (mrp MultiRatePacer) Pace(elapsed time.Duration, hits uint64) (time.Duratio
 		CurrentRate = activeRate
 		elapsedSummary := func() string {
 			if uint64(elapsed.Seconds()) > 0 {
-				return fmt.Sprintf(" (%v elapsed)", elapsed)
+				return fmt.Sprintf(" (%v elapsed)", round(elapsed))
 			}
 			return ""
 		}
@@ -146,5 +166,5 @@ func main() {
 	reporter.Report(os.Stdout)
 
 	attackDuration := time.Since(startedAt)
-	fmt.Printf("✨  Attack completed in %v\n", attackDuration)
+	fmt.Printf("✨  Attack completed in %v\n", round(attackDuration))
 }

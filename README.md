@@ -11,62 +11,62 @@ This code was adapted from a 2017 article on Josh Barrats blog: https://serializ
 
 ```
 $ go run vegeta-varload.go https://www.opsani.com/
-🚀  Start variable load test against https://www.opsani.com/ with 6 load profiles for 44 total seconds
-💥  Attacking at rate of 10 req/sec for 5s (0s elapsed)
-Requests      [total, rate, throughput]         59, 9.99, 9.88
-Duration      [total, attack, wait]             5.974s, 5.904s, 69.698ms
-Latencies     [min, mean, 50, 90, 95, 99, max]  68.801ms, 234.386ms, 260.643ms, 278.544ms, 282.593ms, 386.85ms, 397.14ms
+🚀  Start variable load test against https://golang.org/ with 6 load profiles for 44 total seconds
+💥  Attacking at rate of 10 req/sec for 5s
+Requests      [total, rate, throughput]         59, 9.99, 9.87
+Duration      [total, attack, wait]             5.977s, 5.904s, 73.411ms
+Latencies     [min, mean, 50, 90, 95, 99, max]  68.654ms, 214.712ms, 238.093ms, 253.151ms, 253.714ms, 254.256ms, 254.276ms
 Bytes In      [total, mean]                     653189, 11071.00
 Bytes Out     [total, mean]                     0, 0.00
 Success       [ratio]                           100.00%
 Status Codes  [code:count]                      200:59
 Error Set:
-💥  Attacking at rate of 20 req/sec for 5s (6s elapsed)
-Requests      [total, rate, throughput]         159, 32.46, 32.00
-Duration      [total, attack, wait]             4.969s, 4.898s, 71.609ms
-Latencies     [min, mean, 50, 90, 95, 99, max]  66.987ms, 108.663ms, 92.837ms, 186.03ms, 189.781ms, 190.907ms, 191.036ms
+💥  Attacking at rate of 20 req/sec for 5s (6.001s elapsed)
+Requests      [total, rate, throughput]         159, 32.43, 31.98
+Duration      [total, attack, wait]             4.972s, 4.903s, 69.018ms
+Latencies     [min, mean, 50, 90, 95, 99, max]  66.883ms, 108.037ms, 82.134ms, 202.123ms, 202.533ms, 202.859ms, 202.892ms
 Bytes In      [total, mean]                     1760289, 11071.00
 Bytes Out     [total, mean]                     0, 0.00
 Success       [ratio]                           100.00%
 Status Codes  [code:count]                      200:159
 Error Set:
-💥  Attacking at rate of 30 req/sec for 10s (11s elapsed)
-Requests      [total, rate, throughput]         409, 41.11, 40.81
-Duration      [total, attack, wait]             10.021s, 9.949s, 71.706ms
-Latencies     [min, mean, 50, 90, 95, 99, max]  67.787ms, 178.439ms, 132.946ms, 366.304ms, 391.335ms, 393.376ms, 394.914ms
+💥  Attacking at rate of 30 req/sec for 10s (11.003s elapsed)
+Requests      [total, rate, throughput]         409, 41.10, 40.81
+Duration      [total, attack, wait]             10.022s, 9.952s, 70.199ms
+Latencies     [min, mean, 50, 90, 95, 99, max]  68.609ms, 158.846ms, 83.582ms, 344.221ms, 368.986ms, 387.947ms, 388.953ms
 Bytes In      [total, mean]                     4528039, 11071.00
 Bytes Out     [total, mean]                     0, 0.00
 Success       [ratio]                           100.00%
 Status Codes  [code:count]                      200:409
 Error Set:
-💥  Attacking at rate of 40 req/sec for 10s (21s elapsed)
-Requests      [total, rate, throughput]         610, 61.06, 60.65
-Duration      [total, attack, wait]             10.058s, 9.99s, 68.371ms
-Latencies     [min, mean, 50, 90, 95, 99, max]  66.283ms, 94.093ms, 72.092ms, 167.423ms, 174.303ms, 178.791ms, 179.701ms
-Bytes In      [total, mean]                     6753310, 11071.00
+💥  Attacking at rate of 40 req/sec for 10s (21.005s elapsed)
+Requests      [total, rate, throughput]         609, 61.10, 60.69
+Duration      [total, attack, wait]             10.035s, 9.967s, 68.171ms
+Latencies     [min, mean, 50, 90, 95, 99, max]  65.577ms, 87.344ms, 70.846ms, 136.676ms, 144.97ms, 148.751ms, 150.887ms
+Bytes In      [total, mean]                     6742239, 11071.00
 Bytes Out     [total, mean]                     0, 0.00
 Success       [ratio]                           100.00%
-Status Codes  [code:count]                      200:610
+Status Codes  [code:count]                      200:609
 Error Set:
-💥  Attacking at rate of 50 req/sec for 5s (31s elapsed)
-Requests      [total, rate, throughput]         559, 112.47, 110.97
-Duration      [total, attack, wait]             5.037s, 4.97s, 67.161ms
-Latencies     [min, mean, 50, 90, 95, 99, max]  66.221ms, 119.805ms, 113.698ms, 186.62ms, 233.64ms, 257.057ms, 332.034ms
-Bytes In      [total, mean]                     6188689, 11071.00
+💥  Attacking at rate of 50 req/sec for 5s (31.003s elapsed)
+Requests      [total, rate, throughput]         560, 112.16, 110.66
+Duration      [total, attack, wait]             5.061s, 4.993s, 67.685ms
+Latencies     [min, mean, 50, 90, 95, 99, max]  67.504ms, 132.073ms, 101.869ms, 247.682ms, 266.71ms, 297.917ms, 301.779ms
+Bytes In      [total, mean]                     6199760, 11071.00
 Bytes Out     [total, mean]                     0, 0.00
 Success       [ratio]                           100.00%
-Status Codes  [code:count]                      200:559
+Status Codes  [code:count]                      200:560
 Error Set:
 💥  Attacking at rate of 60 req/sec for 8s (36s elapsed)
-Requests      [total, rate, throughput]         844, 104.69, 103.80
-Duration      [total, attack, wait]             8.131s, 8.062s, 68.763ms
-Latencies     [min, mean, 50, 90, 95, 99, max]  64.79ms, 119.58ms, 75.722ms, 223.715ms, 233.403ms, 238.961ms, 241.214ms
+Requests      [total, rate, throughput]         844, 104.68, 103.79
+Duration      [total, attack, wait]             8.132s, 8.063s, 69.164ms
+Latencies     [min, mean, 50, 90, 95, 99, max]  67.733ms, 110.846ms, 74.004ms, 193.512ms, 216.077ms, 293.628ms, 305.455ms
 Bytes In      [total, mean]                     9343924, 11071.00
 Bytes Out     [total, mean]                     0, 0.00
 Success       [ratio]                           100.00%
 Status Codes  [code:count]                      200:844
 Error Set:
-✨  Attack completed in 44.071653509s
+✨  Attack completed in 44.073s
 ```
 
 ## Building & Running on macOS
