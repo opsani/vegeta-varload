@@ -4,7 +4,7 @@ services:
     vegeta:
         build:
             context: .
-        entrypoint: /root/vegeta_varload http://nginx/
+        entrypoint: /root/vegeta-varload http://nginx/
     
     nginx:
         image: nginx

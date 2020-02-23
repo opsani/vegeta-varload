@@ -3,14 +3,14 @@
 This repository contains an example of running a multi-rate load test using [Vegeta](https://github.com/tsenart/vegeta)
 as a library. This implements a variable load testing utility without any forking or modification of existing project code bases.
 
-The utility will run an attack on a targetr URL (default of http://localhost:8080/) using the rate patterns defined in the `attack.csv` file.
+The utility will run an attack on a target URL (default of http://localhost:8080/) using the rate patterns defined in the `attack.csv` file.
 
 This code was adapted from a 2017 article on Josh Barrats blog: https://serialized.net/2017/06/load-testing-with-vegeta-and-python/
 
 ## Example Output
 
 ```
-$ go run vegeta_varload.go https://www.opsani.com/
+$ go run vegeta-varload.go https://www.opsani.com/
 🚀  Start variable load test against https://www.opsani.com/ with 6 load profiles for 44 total seconds
 💥  Attacking at rate of 10 req/sec for 5s (0s elapsed)
 Requests      [total, rate, throughput]         59, 9.99, 9.88
@@ -75,15 +75,15 @@ All the dependencies necessary to build are available via Homebrew.:
 
 1. Install golang: `$ brew install golang`
 2. Install Vegeta dependency: `$ go get -u github.com/tsenart/vegeta`
-3. Build and run with Go: `$ go run vegeta_breaker.go`
+3. Build and run with Go: `$ go run vegeta-varload.go`
 
 ## Running via Docker
 
 A Dockerfile is provided that can be used to run the load test
 
 ```bash
-$ docker build -t vegeta_varload .
-$ docker run -ti vegeta_varload https://www.opsani.com/
+$ docker build -t vegeta-varload .
+$ docker run -ti vegeta-varload https://www.opsani.com/
 ```
 
 ## Running via Docker Compose
@@ -100,3 +100,7 @@ $ docker-compose logs -f vegeta
 ```bash
 $ docker-compose run vegeta https://www.opsani.com/
 ```
+
+## License
+
+This code is licensed under the terms of the MIT Open Source license just as Vegeta is.

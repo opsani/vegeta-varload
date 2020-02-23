@@ -76,7 +76,13 @@ func (mrp MultiRatePacer) Pace(elapsed time.Duration, hits uint64) (time.Duratio
 		}
 
 		CurrentRate = activeRate
-		fmt.Printf("💥  Attacking at rate of %d req/sec for %v (%ds elapsed)\n", activeRate.Rate, activeRate.Duration, uint64(elapsed.Seconds()))
+		elapsedSummary := func() string {
+			if uint64(elapsed.Seconds()) > 0 {
+				return fmt.Sprintf(" (%v elapsed)", elapsed)
+			}
+			return ""
+		}
+		fmt.Printf("💥  Attacking at rate of %d req/sec for %v%s\n", activeRate.Rate, activeRate.Duration, elapsedSummary())
 	}
 
 	// Calculate when to send the next hit based on the active rate

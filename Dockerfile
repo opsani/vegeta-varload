@@ -5,8 +5,8 @@ RUN set -ex \
     && apk add git
 
 WORKDIR /root
-COPY vegeta_varload.go attack.csv ./
+COPY vegeta-varload.go attack.csv ./
 RUN go get -v -d .
-RUN go build vegeta_varload.go
+RUN go build vegeta-varload.go
 
-ENTRYPOINT ["/root/vegeta_varload"]
+ENTRYPOINT ["/root/vegeta-varload"]
