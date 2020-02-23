@@ -105,7 +105,7 @@ func (mrp MultiRatePacer) Pace(elapsed time.Duration, hits uint64) (time.Duratio
 	}
 
 	// Calculate when to send the next hit based on the active rate
-	if float64(hits) < expectedHits {
+	if hits < uint64(expectedHits) {
 		// Running behind, send next hit immediately.
 		return 0, false
 	}
@@ -113,7 +113,6 @@ func (mrp MultiRatePacer) Pace(elapsed time.Duration, hits uint64) (time.Duratio
 	nsPerHit := math.Round(1 / mrp.hitsPerNs(activeRate))
 	hitsToWait := float64(hits+1) - float64(expectedHits)
 	nextHitIn := time.Duration(nsPerHit * hitsToWait)
-
 	return nextHitIn, false
 }
 
