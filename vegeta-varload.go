@@ -15,20 +15,23 @@ import (
 	vegeta "github.com/tsenart/vegeta/lib"
 )
 
+// RateDescriptor describes a rate in requests per second and duration.
 type RateDescriptor struct {
 	Rate     uint          `json:"rate"`
 	Duration time.Duration `json:"duration"`
 }
 
 func (rs RateDescriptor) String() string {
-	return fmt.Sprintf("%v req/s for %v", rs.Rate, rs.Duration)
+	return fmt.Sprintf("%vreq/s for %v", rs.Rate, rs.Duration)
 }
 
+// AttackDescriptor describes an attack by name and series of rates.
 type AttackDescriptor struct {
 	Name  string           `json:"name"`
 	Rates []RateDescriptor `json:"rates"`
 }
 
+// Duration returns the aggregate time in an attack by summing all the duration of the rates.
 func (attack AttackDescriptor) Duration() time.Duration {
 	duration := time.Second
 	for _, rate := range attack.Rates {
@@ -37,15 +40,16 @@ func (attack AttackDescriptor) Duration() time.Duration {
 	return duration
 }
 
-type VariableRatePacer struct {
+// StepFunctionPacer paces an attack with specific request rates for specific durations.
+type StepFunctionPacer struct {
 	Attack AttackDescriptor
 }
 
-func (vrp VariableRatePacer) String() string {
+func (vrp StepFunctionPacer) String() string {
 	return fmt.Sprintf("Variable Rates{%s: %d rates}", vrp.Attack.Name, len(vrp.Attack.Rates))
 }
 
-// Rounding support lifted from Vegeta reporters since it is private
+// Rounding support lifted from Vegeta reporters since it is private.
 var durations = [...]time.Duration{
 	time.Hour,
 	time.Minute,
@@ -55,7 +59,7 @@ var durations = [...]time.Duration{
 	time.Nanosecond,
 }
 
-// round to the next most precise unit
+// round to the next most precise unit.
 func round(d time.Duration) time.Duration {
 	for i, unit := range durations {
 		if d >= unit && i < len(durations)-1 {
@@ -65,17 +69,24 @@ func round(d time.Duration) time.Duration {
 	return d
 }
 
-// Globals for state management
-var CurrentRate RateDescriptor
-var CurrentMetrics vegeta.Metrics
+// pacerState maintains state for a Vegeta pacer.
+type pacerState struct {
+	Rate    RateDescriptor
+	Metrics vegeta.Metrics
+}
+
+// activePacerState maintains state for the actively executing Vegeta pacer
+// This is only necessary because the `Pace` function is called by value
+// rather than by reference.
+var activePacerState pacerState
 
 // Pace determines the length of time to sleep until the next hit is sent.
-func (vrp VariableRatePacer) Pace(elapsed time.Duration, hits uint64) (time.Duration, bool) {
+func (pacer StepFunctionPacer) Pace(elapsed time.Duration, hits uint64) (time.Duration, bool) {
 	// Determine which Rate is active and accumulate and expected number of hits
 	var activeRate RateDescriptor
 	aggregateDuration := time.Second
-	expectedHits := vrp.hits(elapsed)
-	for _, rate := range vrp.Attack.Rates {
+	expectedHits := pacer.hits(elapsed)
+	for _, rate := range pacer.Attack.Rates {
 		aggregateDuration += rate.Duration
 		if elapsed <= aggregateDuration {
 			activeRate = rate
@@ -85,20 +96,20 @@ func (vrp VariableRatePacer) Pace(elapsed time.Duration, hits uint64) (time.Dura
 
 	// Use the last rate if we didn't find one
 	if activeRate == (RateDescriptor{}) {
-		activeRate = vrp.Attack.Rates[len(vrp.Attack.Rates)-1]
-		fmt.Printf("🔥  Setting default rate of %d req/sec for remainder of attack\n", activeRate.Rate)
+		activeRate = pacer.Attack.Rates[len(pacer.Attack.Rates)-1]
+		fmt.Printf("🔥  Setting default rate of %dreq/sec for remainder of attack\n", activeRate.Rate)
 	}
 
 	// Report when the rate changes
-	if CurrentRate != activeRate {
-		CurrentMetrics.Close()
-		if CurrentMetrics.Requests > 0 {
-			reporter := vegeta.NewTextReporter(&CurrentMetrics)
+	if activePacerState.Rate != activeRate {
+		if activePacerState.Metrics.Requests > 0 {
+			activePacerState.Metrics.Close()
+			reporter := vegeta.NewTextReporter(&activePacerState.Metrics)
 			reporter.Report(os.Stdout)
-			CurrentMetrics = vegeta.Metrics{}
+			activePacerState.Metrics = vegeta.Metrics{}
 		}
 
-		CurrentRate = activeRate
+		activePacerState.Rate = activeRate
 		elapsedSummary := func() string {
 			if uint64(elapsed.Seconds()) > 0 {
 				return fmt.Sprintf(" (%v elapsed)", round(elapsed))
@@ -114,20 +125,20 @@ func (vrp VariableRatePacer) Pace(elapsed time.Duration, hits uint64) (time.Dura
 		return 0, false
 	}
 
-	nsPerHit := math.Round(1 / vrp.hitsPerNs(activeRate))
+	nsPerHit := math.Round(1 / pacer.hitsPerNs(activeRate))
 	hitsToWait := float64(hits+1) - float64(expectedHits)
 	nextHitIn := time.Duration(nsPerHit * hitsToWait)
 	return nextHitIn, false
 }
 
-func (vrp VariableRatePacer) hitsPerNs(rate RateDescriptor) float64 {
+func (pacer StepFunctionPacer) hitsPerNs(rate RateDescriptor) float64 {
 	return float64(rate.Rate) / float64(time.Second)
 }
 
-func (vrp VariableRatePacer) hits(duration time.Duration) float64 {
+func (pacer StepFunctionPacer) hits(duration time.Duration) float64 {
 	hits := float64(0)
 	aggregateDuration := time.Second
-	for _, rate := range vrp.Attack.Rates {
+	for _, rate := range pacer.Attack.Rates {
 		hits += (float64(rate.Rate) * rate.Duration.Seconds())
 		aggregateDuration += rate.Duration
 		if duration <= aggregateDuration {
@@ -168,16 +179,16 @@ func main() {
 		Method: "GET",
 		URL:    targetURL,
 	})
-	pacer := VariableRatePacer{Attack: attack}
+	pacer := StepFunctionPacer{Attack: attack}
 	attacker := vegeta.NewAttacker()
 	startedAt := time.Now()
 	for res := range attacker.Attack(targeter, pacer, attack.Duration(), attack.Name) {
-		CurrentMetrics.Add(res)
+		activePacerState.Metrics.Add(res)
 	}
 
-	CurrentMetrics.Close()
+	activePacerState.Metrics.Close()
 
-	reporter := vegeta.NewTextReporter(&CurrentMetrics)
+	reporter := vegeta.NewTextReporter(&activePacerState.Metrics)
 	reporter.Report(os.Stdout)
 
 	attackDuration := time.Since(startedAt)
