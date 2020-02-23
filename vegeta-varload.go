@@ -69,10 +69,9 @@ var CurrentMetrics vegeta.Metrics
 func (mrp MultiRatePacer) Pace(elapsed time.Duration, hits uint64) (time.Duration, bool) {
 	// Determine which Rate is active and accumulate and expected number of hits
 	var activeRate RateDescriptor
-	expectedHits := uint64(0)
 	aggregateDuration := time.Second
+	expectedHits := mrp.hits(elapsed)
 	for _, rate := range mrp.Attack.Rates {
-		expectedHits += (uint64(rate.Rate) * uint64(rate.Duration/time.Second))
 		aggregateDuration += rate.Duration
 		if elapsed <= aggregateDuration {
 			activeRate = rate
@@ -106,7 +105,7 @@ func (mrp MultiRatePacer) Pace(elapsed time.Duration, hits uint64) (time.Duratio
 	}
 
 	// Calculate when to send the next hit based on the active rate
-	if hits < expectedHits {
+	if float64(hits) < expectedHits {
 		// Running behind, send next hit immediately.
 		return 0, false
 	}
@@ -119,16 +118,16 @@ func (mrp MultiRatePacer) Pace(elapsed time.Duration, hits uint64) (time.Duratio
 }
 
 func (mrp MultiRatePacer) hitsPerNs(rate RateDescriptor) float64 {
-	return float64(rate.Rate) / float64(1*time.Second)
+	return float64(rate.Rate) / float64(time.Second)
 }
 
-func (mrp MultiRatePacer) hits(t time.Duration) uint64 {
-	hits := uint64(0)
-	duration := time.Second
+func (mrp MultiRatePacer) hits(duration time.Duration) float64 {
+	hits := float64(0)
+	aggregateDuration := time.Second
 	for _, rate := range mrp.Attack.Rates {
-		hits += (uint64(rate.Rate) * uint64(rate.Duration/time.Second))
-		duration += rate.Duration
-		if t <= duration {
+		hits += (float64(rate.Rate) * rate.Duration.Seconds())
+		aggregateDuration += rate.Duration
+		if duration <= aggregateDuration {
 			break
 		}
 	}
