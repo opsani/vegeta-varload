@@ -12,25 +12,22 @@ This code was adapted from a 2017 article on Josh Barrats blog: https://serializ
 ```
 $ go run vegeta_varload.go https://www.opsani.com/
 🚀  Start variable load test against https://www.opsani.com/ with 6 load profiles for 44 total seconds
-💥  Attacking at rate of 100 req/sec (0 seconds elapsed)
-💥  Attacking at rate of 200 req/sec (6 seconds elapsed)
-💥  Attacking at rate of 300 req/sec (11 seconds elapsed)
-💥  Attacking at rate of 350 req/sec (21 seconds elapsed)
-💥  Attacking at rate of 200 req/sec (31 seconds elapsed)
-✨  Attack completed (latency 30.001291979s, 10851 requests sent)
-Requests      [total, rate, throughput]         10851, 199.99, 19.60
-Duration      [total, attack, wait]             1m1s, 54.256s, 7.136s
-Latencies     [min, mean, 50, 90, 95, 99, max]  77.84ms, 21.728s, 30s, 30.001s, 30.001s, 30.002s, 30.025s
-Bytes In      [total, mean]                     164683161, 15176.77
+💥  Attacking at rate of 10 req/sec for 5s (0s elapsed)
+💥  Attacking at rate of 20 req/sec for 5s (6s elapsed)
+💥  Attacking at rate of 30 req/sec for 10s (11s elapsed)
+💥  Attacking at rate of 40 req/sec for 10s (21s elapsed)
+💥  Attacking at rate of 50 req/sec for 5s (31s elapsed)
+💥  Attacking at rate of 60 req/sec for 8s (36s elapsed)
+✨  Attack completed (latency 764.511853ms, 2640 requests sent)
+Requests      [total, rate, throughput]         2640, 60.00, 32.98
+Duration      [total, attack, wait]             44.083s, 44.001s, 81.816ms
+Latencies     [min, mean, 50, 90, 95, 99, max]  77.216ms, 272.827ms, 160.355ms, 679.439ms, 764.512ms, 866.838ms, 1.042s
+Bytes In      [total, mean]                     154226160, 58419.00
 Bytes Out     [total, mean]                     0, 0.00
-Success       [ratio]                           11.09%
-Status Codes  [code:count]                      0:8032  200:1203  403:1616
+Success       [ratio]                           55.08%
+Status Codes  [code:count]                      200:1454  403:1186
 Error Set:
 403 Forbidden
-Get https://www.opsani.com/: EOF
-Get https://www.opsani.com/: net/http: request canceled while waiting for connection (Client.Timeout exceeded while awaiting headers)
-net/http: request canceled (Client.Timeout exceeded while reading body)
-Get https://www.opsani.com/: net/http: request canceled (Client.Timeout exceeded while awaiting headers)
 ```
 
 ## Building & Running on macOS
