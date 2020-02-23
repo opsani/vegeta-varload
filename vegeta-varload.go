@@ -20,6 +20,10 @@ type RateDescriptor struct {
 	Duration time.Duration `json:"duration"`
 }
 
+func (rs RateDescriptor) String() string {
+	return fmt.Sprintf("%v req/s for %v", rs.Rate, rs.Duration)
+}
+
 type AttackDescriptor struct {
 	Name  string           `json:"name"`
 	Rates []RateDescriptor `json:"rates"`
@@ -33,12 +37,12 @@ func (attack AttackDescriptor) Duration() time.Duration {
 	return duration
 }
 
-type MultiRatePacer struct {
+type VariableRatePacer struct {
 	Attack AttackDescriptor
 }
 
-func (mrp MultiRatePacer) String() string {
-	return fmt.Sprintf("Multi Rate{%s: %d rates}", mrp.Attack.Name, len(mrp.Attack.Rates))
+func (vrp VariableRatePacer) String() string {
+	return fmt.Sprintf("Variable Rates{%s: %d rates}", vrp.Attack.Name, len(vrp.Attack.Rates))
 }
 
 // Rounding support lifted from Vegeta reporters since it is private
@@ -64,14 +68,15 @@ func round(d time.Duration) time.Duration {
 // Globals for state management
 var CurrentRate RateDescriptor
 var CurrentMetrics vegeta.Metrics
+var CurrentRateSetAt time.Time
 
 // Pace determines the length of time to sleep until the next hit is sent.
-func (mrp MultiRatePacer) Pace(elapsed time.Duration, hits uint64) (time.Duration, bool) {
+func (vrp VariableRatePacer) Pace(elapsed time.Duration, hits uint64) (time.Duration, bool) {
 	// Determine which Rate is active and accumulate and expected number of hits
 	var activeRate RateDescriptor
 	aggregateDuration := time.Second
-	expectedHits := mrp.hits(elapsed)
-	for _, rate := range mrp.Attack.Rates {
+	expectedHits := vrp.hits(elapsed)
+	for _, rate := range vrp.Attack.Rates {
 		aggregateDuration += rate.Duration
 		if elapsed <= aggregateDuration {
 			activeRate = rate
@@ -81,7 +86,7 @@ func (mrp MultiRatePacer) Pace(elapsed time.Duration, hits uint64) (time.Duratio
 
 	// Use the last rate if we didn't find one
 	if activeRate == (RateDescriptor{}) {
-		activeRate = mrp.Attack.Rates[len(mrp.Attack.Rates)-1]
+		activeRate = vrp.Attack.Rates[len(vrp.Attack.Rates)-1]
 		fmt.Printf("🔥  Setting default rate of %d req/sec for remainder of attack\n", activeRate.Rate)
 	}
 
@@ -95,13 +100,14 @@ func (mrp MultiRatePacer) Pace(elapsed time.Duration, hits uint64) (time.Duratio
 		}
 
 		CurrentRate = activeRate
+		CurrentRateSetAt = time.Now()
 		elapsedSummary := func() string {
 			if uint64(elapsed.Seconds()) > 0 {
 				return fmt.Sprintf(" (%v elapsed)", round(elapsed))
 			}
 			return ""
 		}
-		fmt.Printf("💥  Attacking at rate of %d req/sec for %v%s\n", activeRate.Rate, activeRate.Duration, elapsedSummary())
+		fmt.Printf("💥  Attacking at a rate of %v%s\n", activeRate, elapsedSummary())
 	}
 
 	// Calculate when to send the next hit based on the active rate
@@ -110,20 +116,20 @@ func (mrp MultiRatePacer) Pace(elapsed time.Duration, hits uint64) (time.Duratio
 		return 0, false
 	}
 
-	nsPerHit := math.Round(1 / mrp.hitsPerNs(activeRate))
+	nsPerHit := math.Round(1 / vrp.hitsPerNs(activeRate))
 	hitsToWait := float64(hits+1) - float64(expectedHits)
 	nextHitIn := time.Duration(nsPerHit * hitsToWait)
 	return nextHitIn, false
 }
 
-func (mrp MultiRatePacer) hitsPerNs(rate RateDescriptor) float64 {
+func (vrp VariableRatePacer) hitsPerNs(rate RateDescriptor) float64 {
 	return float64(rate.Rate) / float64(time.Second)
 }
 
-func (mrp MultiRatePacer) hits(duration time.Duration) float64 {
+func (vrp VariableRatePacer) hits(duration time.Duration) float64 {
 	hits := float64(0)
 	aggregateDuration := time.Second
-	for _, rate := range mrp.Attack.Rates {
+	for _, rate := range vrp.Attack.Rates {
 		hits += (float64(rate.Rate) * rate.Duration.Seconds())
 		aggregateDuration += rate.Duration
 		if duration <= aggregateDuration {
@@ -164,11 +170,13 @@ func main() {
 		Method: "GET",
 		URL:    targetURL,
 	})
-	pacer := MultiRatePacer{Attack: attack}
+	pacer := VariableRatePacer{Attack: attack}
 	attacker := vegeta.NewAttacker()
 	startedAt := time.Now()
 	for res := range attacker.Attack(targeter, pacer, attack.Duration(), attack.Name) {
-		CurrentMetrics.Add(res)
+		if res.Timestamp.After(CurrentRateSetAt) {
+			CurrentMetrics.Add(res)
+		}
 	}
 
 	CurrentMetrics.Close()
