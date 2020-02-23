@@ -109,6 +109,9 @@ func (mrp MultiRatePacer) Pace(elapsed time.Duration, hits uint64) (time.Duratio
 	if hits < expectedHits {
 		// Running behind, send next hit immediately.
 		return 0, false
+	} else if hits > expectedHits {
+		// Running ahead, sleep for a bit.
+		return 100 * time.Millisecond, false
 	}
 	per := 1 * time.Second
 	interval := uint64(per.Nanoseconds() / int64(activeRate.Rate))
