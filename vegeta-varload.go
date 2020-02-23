@@ -159,7 +159,7 @@ func main() {
 	if len(os.Args) == 2 {
 		targetURL = os.Args[1]
 	}
-	fmt.Printf("🚀  Starting variable load test against %s with %d load profiles for %d total seconds\n", targetURL, len(attack.Rates), uint64(attack.Duration().Seconds()))
+	fmt.Printf("🚀  Starting variable load test against %s with %d load profiles for %v\n", targetURL, len(attack.Rates), round(attack.Duration()))
 	targeter := vegeta.NewStaticTargeter(vegeta.Target{
 		Method: "GET",
 		URL:    targetURL,
