@@ -9,7 +9,7 @@ This code was adapted from a 2017 article on Josh Barrats blog: https://serializ
 
 ## Example Output
 
-```
+```console
 $ go run vegeta-varload.go https://www.opsani.com/
 🚀  Start variable load test against https://golang.org/ with 6 load profiles for 44 total seconds
 💥  Attacking at rate of 10 req/sec for 5s
@@ -81,7 +81,7 @@ All the dependencies necessary to build are available via Homebrew.:
 
 A Dockerfile is provided that can be used to run the load test
 
-```bash
+```console
 $ docker build -t vegeta-varload .
 $ docker run -ti vegeta-varload https://www.opsani.com/
 ```
@@ -90,14 +90,14 @@ $ docker run -ti vegeta-varload https://www.opsani.com/
 
 A Docker Compose assembly is provided that will run Nginx in one container and load test it with Vegeta Varload in another.
 
-```bash
+```console
 $ docker-compose up -d
 $ docker-compose logs -f vegeta
 ```
 
 ### Running ad-hoc load tests through Compose
 
-```bash
+```console
 $ docker-compose run vegeta https://www.opsani.com/
 ```
 
