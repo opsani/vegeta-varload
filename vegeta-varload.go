@@ -109,20 +109,30 @@ func (mrp MultiRatePacer) Pace(elapsed time.Duration, hits uint64) (time.Duratio
 	if hits < expectedHits {
 		// Running behind, send next hit immediately.
 		return 0, false
-	} else if hits > expectedHits {
-		// Running ahead, sleep for a bit.
-		return 100 * time.Millisecond, false
 	}
-	per := 1 * time.Second
-	interval := uint64(per.Nanoseconds() / int64(activeRate.Rate))
-	if math.MaxInt64/interval < hits {
-		// We would overflow delta if we continued, so stop the attack.
-		return 0, true
-	}
-	delta := time.Duration((hits + 1) * interval)
 
-	// Zero or negative durations cause time.Sleep to return immediately.
-	return delta - elapsed, false
+	nsPerHit := math.Round(1 / mrp.hitsPerNs(activeRate))
+	hitsToWait := float64(hits+1) - float64(expectedHits)
+	nextHitIn := time.Duration(nsPerHit * hitsToWait)
+
+	return nextHitIn, false
+}
+
+func (mrp MultiRatePacer) hitsPerNs(rate RateDescriptor) float64 {
+	return float64(rate.Rate) / float64(1*time.Second)
+}
+
+func (mrp MultiRatePacer) hits(t time.Duration) uint64 {
+	hits := uint64(0)
+	duration := time.Second
+	for _, rate := range mrp.Attack.Rates {
+		hits += (uint64(rate.Rate) * uint64(rate.Duration/time.Second))
+		duration += rate.Duration
+		if t <= duration {
+			break
+		}
+	}
+	return hits
 }
 
 func main() {
