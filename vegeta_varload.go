@@ -41,7 +41,9 @@ func (mrp MultiRatePacer) String() string {
 	return fmt.Sprintf("Multi Rate{%s: %d rates}", mrp.Attack.Name, len(mrp.Attack.Rates))
 }
 
+// Globals for state management
 var CurrentRate RateDescriptor
+var CurrentMetrics vegeta.Metrics
 
 // Pace determines the length of time to sleep until the next hit is sent.
 func (mrp MultiRatePacer) Pace(elapsed time.Duration, hits uint64) (time.Duration, bool) {
@@ -66,6 +68,13 @@ func (mrp MultiRatePacer) Pace(elapsed time.Duration, hits uint64) (time.Duratio
 
 	// Report when the rate changes
 	if CurrentRate != activeRate {
+		CurrentMetrics.Close()
+		if CurrentMetrics.Requests > 0 {
+			reporter := vegeta.NewTextReporter(&CurrentMetrics)
+			reporter.Report(os.Stdout)
+			CurrentMetrics = vegeta.Metrics{}
+		}
+
 		CurrentRate = activeRate
 		fmt.Printf("💥  Attacking at rate of %d req/sec for %v (%ds elapsed)\n", activeRate.Rate, activeRate.Duration, uint64(elapsed.Seconds()))
 	}
@@ -120,15 +129,16 @@ func main() {
 	})
 	pacer := MultiRatePacer{Attack: attack}
 	attacker := vegeta.NewAttacker()
-	var metrics vegeta.Metrics
+	startedAt := time.Now()
 	for res := range attacker.Attack(targeter, pacer, attack.Duration(), attack.Name) {
-		metrics.Add(res)
+		CurrentMetrics.Add(res)
 	}
-	metrics.Close()
 
-	latency := metrics.Latencies.P95
-	fmt.Printf("✨  Attack completed (latency %s, %d requests sent)\n", latency, metrics.Requests)
+	CurrentMetrics.Close()
 
-	reporter := vegeta.NewTextReporter(&metrics)
+	reporter := vegeta.NewTextReporter(&CurrentMetrics)
 	reporter.Report(os.Stdout)
+
+	attackDuration := time.Since(startedAt)
+	fmt.Printf("✨  Attack completed in %v\n", attackDuration)
 }
