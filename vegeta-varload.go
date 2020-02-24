@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"encoding/csv"
+	"flag"
 	"fmt"
 	"io"
 	"log"
@@ -148,26 +149,102 @@ func (pacer StepFunctionPacer) hits(duration time.Duration) float64 {
 	return hits
 }
 
-func main() {
-	// Load the attack CSV
-	csvFile, _ := os.Open("attack.csv")
-	reader := csv.NewReader(bufio.NewReader(csvFile))
-	var attack AttackDescriptor
-	attack.Name = "Variable Load Test"
+// paceOpts aggregates the pacing command line options
+type paceOpts struct {
+	file     string
+	pacer    string
+	pacing   string
+	duration time.Duration
+}
+
+type dynamicPacer interface {
+	vegeta.Pacer
+	setAttack(attack AttackDescriptor)
+	parsePacingCSV(csv *csv.Reader) []RateDescriptor
+	parsePacingStr(pacing string) []RateDescriptor
+}
+
+func (pacer StepFunctionPacer) parsePacingCSV(csv *csv.Reader) []RateDescriptor {
+	var rates []RateDescriptor
 	for {
-		line, error := reader.Read()
-		if error == io.EOF {
+		line, err := csv.Read()
+		if err == io.EOF {
 			break
-		} else if error != nil {
-			log.Fatal(error)
+		} else if err != nil {
+			log.Fatal(err)
 		}
-		rate, _ := strconv.Atoi(line[0])
-		duration, _ := time.ParseDuration(strings.TrimSpace(line[1]))
-		attack.Rates = append(attack.Rates, RateDescriptor{
+
+		rate, err := strconv.Atoi(line[0])
+		if err != nil {
+			log.Fatal(err)
+		}
+		duration, err := time.ParseDuration(strings.TrimSpace(line[1]))
+		if err != nil {
+			log.Fatal(err)
+		}
+		rates = append(rates, RateDescriptor{
 			Rate:     uint(rate),
 			Duration: duration,
 		})
 	}
+	return rates
+}
+
+func (pacer StepFunctionPacer) parsePacingStr(pacing string) []RateDescriptor {
+	// TODO: Parse a two dimensional string
+	var rates []RateDescriptor
+	return rates
+}
+
+func (pacer *StepFunctionPacer) setAttack(attack AttackDescriptor) {
+	pacer.Attack = attack
+}
+
+func main() {
+	// Parse the commandline options
+	pacers := []string{"step-function", "curve-fitting"}
+	opts := paceOpts{}
+	flag.StringVar(&opts.pacer, "pacer", "",
+		fmt.Sprintf("Pacer [%s]", strings.Join(pacers, ", ")))
+	flag.StringVar(&opts.pacing, "pacing", "", "String describing the pace")
+	flag.StringVar(&opts.file, "file", "", "CSV file describing the pace")
+	flag.DurationVar(&opts.duration, "duration", 0, "Duration of the test. Required when pacer is \"curve-fitting\"")
+	flag.Parse()
+
+	if len(os.Args) == 1 {
+		flag.Usage()
+		os.Exit(1)
+	}
+
+	if opts.file == "" && opts.pacing == "" {
+		err := fmt.Errorf("-file or -pacing must be provided")
+		log.Fatal(err)
+	}
+
+	var pacer dynamicPacer
+	switch opts.pacer {
+	case "step-function":
+		pacer = &StepFunctionPacer{}
+	case "cuve-fitting":
+		// TODO
+	default:
+		err := fmt.Errorf("unknown pacer type: %q", opts.pacer)
+		log.Fatal(err)
+	}
+
+	// Build the attack
+	var attack AttackDescriptor
+	attack.Name = "Variable Load Test"
+	if opts.file != "" {
+		csvFile, err := os.Open(opts.file)
+		if err != nil {
+			log.Fatal(err)
+		}
+		csv := csv.NewReader(bufio.NewReader(csvFile))
+		attack.Rates = pacer.parsePacingCSV(csv)
+	} else if opts.pacing != "" {
+	}
+	pacer.setAttack(attack)
 
 	// Run the attack
 	targetURL := "http://localhost:8080/"
@@ -179,7 +256,6 @@ func main() {
 		Method: "GET",
 		URL:    targetURL,
 	})
-	pacer := StepFunctionPacer{Attack: attack}
 	attacker := vegeta.NewAttacker()
 	startedAt := time.Now()
 	for res := range attacker.Attack(targeter, pacer, attack.Duration(), attack.Name) {
