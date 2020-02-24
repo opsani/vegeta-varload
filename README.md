@@ -111,13 +111,13 @@ A Docker Compose assembly is provided that will run Nginx in one container and l
 
 ```console
 $ docker-compose up -d
-$ docker-compose logs -f vegeta
+$ docker-compose logs -f vegeta-varload
 ```
 
 ### Running ad-hoc load tests through Compose
 
 ```console
-$ docker-compose run vegeta https://www.opsani.com/
+$ docker-compose run vegeta-varload --url https://www.opsani.com/ --pacer step-function --pacing "10s@15, 1m@20"
 ```
 
 ## Acknowledgements
