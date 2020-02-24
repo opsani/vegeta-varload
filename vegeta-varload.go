@@ -17,6 +17,10 @@ import (
 	vegeta "github.com/tsenart/vegeta/lib"
 )
 
+/**
+Supporting models & utility code
+**/
+
 // RateDescriptor describes a rate in requests per second and duration.
 type RateDescriptor struct {
 	Rate     uint          `json:"rate"`
@@ -42,14 +46,24 @@ func (attack AttackDescriptor) Duration() time.Duration {
 	return duration
 }
 
-// StepFunctionPacer paces an attack with specific request rates for specific durations.
-type StepFunctionPacer struct {
-	Attack AttackDescriptor
+// dynamicPacer defines the abstract interface for pacers the can build attack plans from CSV files or strings.
+type dynamicPacer interface {
+	vegeta.Pacer
+	setAttack(attack AttackDescriptor)
+	parsePacingCSV(csv *csv.Reader) []RateDescriptor
+	parsePacingStr(pacing string) []RateDescriptor
 }
 
-func (vrp StepFunctionPacer) String() string {
-	return fmt.Sprintf("Variable Rates{%s: %d rates}", vrp.Attack.Name, len(vrp.Attack.Rates))
+// pacerState maintains state for a Vegeta pacer.
+type pacerState struct {
+	Rate    RateDescriptor
+	Metrics vegeta.Metrics
 }
+
+// activePacerState maintains state for the actively executing Vegeta pacer
+// This is only necessary because the `Pace` function is called by value
+// rather than by reference.
+var activePacerState pacerState
 
 // Rounding support lifted from Vegeta reporters since it is private.
 var durations = [...]time.Duration{
@@ -71,16 +85,18 @@ func round(d time.Duration) time.Duration {
 	return d
 }
 
-// pacerState maintains state for a Vegeta pacer.
-type pacerState struct {
-	Rate    RateDescriptor
-	Metrics vegeta.Metrics
+/**
+Dynamic Pacer Implementations
+**/
+
+// StepFunctionPacer paces an attack with specific request rates for specific durations.
+type StepFunctionPacer struct {
+	Attack AttackDescriptor
 }
 
-// activePacerState maintains state for the actively executing Vegeta pacer
-// This is only necessary because the `Pace` function is called by value
-// rather than by reference.
-var activePacerState pacerState
+func (pacer StepFunctionPacer) String() string {
+	return fmt.Sprintf("Variable Rates{%s: %d rates}", pacer.Attack.Name, len(pacer.Attack.Rates))
+}
 
 // Pace determines the length of time to sleep until the next hit is sent.
 func (pacer StepFunctionPacer) Pace(elapsed time.Duration, hits uint64) (time.Duration, bool) {
@@ -152,22 +168,6 @@ func (pacer StepFunctionPacer) hits(duration time.Duration) float64 {
 	return hits
 }
 
-// paceOpts aggregates the pacing command line options
-type paceOpts struct {
-	url      string
-	file     string
-	pacer    string
-	pacing   string
-	duration time.Duration
-}
-
-type dynamicPacer interface {
-	vegeta.Pacer
-	setAttack(attack AttackDescriptor)
-	parsePacingCSV(csv *csv.Reader) []RateDescriptor
-	parsePacingStr(pacing string) []RateDescriptor
-}
-
 func (pacer StepFunctionPacer) parsePacingCSV(csv *csv.Reader) []RateDescriptor {
 	var rates []RateDescriptor
 	for {
@@ -225,6 +225,19 @@ func (pacer StepFunctionPacer) parsePacingStr(pacing string) []RateDescriptor {
 
 func (pacer *StepFunctionPacer) setAttack(attack AttackDescriptor) {
 	pacer.Attack = attack
+}
+
+/**
+CLI interface
+**/
+
+// paceOpts aggregates the pacing command line options
+type paceOpts struct {
+	url      string
+	file     string
+	pacer    string
+	pacing   string
+	duration time.Duration
 }
 
 func main() {
