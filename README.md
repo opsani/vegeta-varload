@@ -1,6 +1,6 @@
 # Vegeta Variable Load Testing
 
-This repository contains variable rate load testing utility built on top of [Vegeta](https://github.com/tsenart/vegeta). It is capable of delivering varying load levels to an application under test by providing a set of implementations of the [`vegeta.Pacer`](https://github.com/tsenart/vegeta/blob/master/lib/pacer.go) interface. Pacer implementations govern the load rate by determining when the next request should be sent -- allowing for the acceleration or deceleration of the request rate based on arbitrary logic.
+This repository contains a variable rate load testing utility built on top of [Vegeta](https://github.com/tsenart/vegeta). It is capable of delivering a dynamic load to an application under test by providing a set of implementations of the [`vegeta.Pacer`](https://github.com/tsenart/vegeta/blob/master/lib/pacer.go) interface. Pacer implementations govern the load rate by determining when the next request should be sent -- allowing for the acceleration or deceleration of the request rate based on arbitrary logic.
 
 ### Pacers
 
