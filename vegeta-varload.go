@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"math"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -151,6 +152,7 @@ func (pacer StepFunctionPacer) hits(duration time.Duration) float64 {
 
 // paceOpts aggregates the pacing command line options
 type paceOpts struct {
+	url      string
 	file     string
 	pacer    string
 	pacing   string
@@ -204,6 +206,7 @@ func main() {
 	// Parse the commandline options
 	pacers := []string{"step-function", "curve-fitting"}
 	opts := paceOpts{}
+	flag.StringVar(&opts.url, "url", "http://localhost:8080/", "The URL to attack")
 	flag.StringVar(&opts.pacer, "pacer", "",
 		fmt.Sprintf("Pacer [%s]", strings.Join(pacers, ", ")))
 	flag.StringVar(&opts.pacing, "pacing", "", "String describing the pace")
@@ -214,6 +217,12 @@ func main() {
 	if len(os.Args) == 1 {
 		flag.Usage()
 		os.Exit(1)
+	}
+
+	_, err := url.ParseRequestURI(opts.url)
+	if err != nil {
+		msg := fmt.Errorf("invalid URL %q: %s", opts.url, err)
+		log.Fatal(msg)
 	}
 
 	if opts.file == "" && opts.pacing == "" {
@@ -247,14 +256,10 @@ func main() {
 	pacer.setAttack(attack)
 
 	// Run the attack
-	targetURL := "http://localhost:8080/"
-	if len(os.Args) == 2 {
-		targetURL = os.Args[1]
-	}
-	fmt.Printf("🚀  Starting variable load test against %s with %d load profiles for %v\n", targetURL, len(attack.Rates), round(attack.Duration()))
+	fmt.Printf("🚀  Starting variable load test against %s with %d load profiles for %v\n", opts.url, len(attack.Rates), round(attack.Duration()))
 	targeter := vegeta.NewStaticTargeter(vegeta.Target{
 		Method: "GET",
-		URL:    targetURL,
+		URL:    opts.url,
 	})
 	attacker := vegeta.NewAttacker()
 	startedAt := time.Now()
@@ -268,5 +273,5 @@ func main() {
 	reporter.Report(os.Stdout)
 
 	attackDuration := time.Since(startedAt)
-	fmt.Printf("✨  Variable load test against %s completed in %v\n", targetURL, round(attackDuration))
+	fmt.Printf("✨  Variable load test against %s completed in %v\n", opts.url, round(attackDuration))
 }
