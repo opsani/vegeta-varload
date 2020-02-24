@@ -95,7 +95,7 @@ type StepFunctionPacer struct {
 }
 
 func (pacer StepFunctionPacer) String() string {
-	return fmt.Sprintf("Variable Rates{%s: %d rates}", pacer.Attack.Name, len(pacer.Attack.Rates))
+	return fmt.Sprintf("StepFunctionPacer Rates{%s: %d rates}", pacer.Attack.Name, len(pacer.Attack.Rates))
 }
 
 // Pace determines the length of time to sleep until the next hit is sent.
@@ -138,7 +138,7 @@ func (pacer StepFunctionPacer) Pace(elapsed time.Duration, hits uint64) (time.Du
 	}
 
 	// Calculate when to send the next hit based on the active rate
-	if hits < uint64(expectedHits) {
+	if hits == 0 || hits < uint64(expectedHits) {
 		// Running behind, send next hit immediately.
 		return 0, false
 	}
@@ -227,6 +227,192 @@ func (pacer *StepFunctionPacer) setAttack(attack AttackDescriptor) {
 	pacer.Attack = attack
 }
 
+//------------------------------------------------------------------
+
+// CurveFittingPacer chases a set of target rates spread out of a total duration.
+type CurveFittingPacer struct {
+	Duration time.Duration
+	Attack   AttackDescriptor
+	Slope    float64
+}
+
+func (pacer CurveFittingPacer) String() string {
+	return fmt.Sprintf("CurveFittingPacer Rates{%s: %d rates}", pacer.Attack.Name, len(pacer.Attack.Rates))
+}
+
+// Pace determines the length of time to sleep until the next hit is sent.
+func (pacer CurveFittingPacer) Pace(elapsed time.Duration, hits uint64) (time.Duration, bool) {
+	// Determine which Rate is active and accumulate and expected number of hits
+	var activeRate RateDescriptor
+	aggregateDuration := time.Second
+	for _, rate := range pacer.Attack.Rates {
+		aggregateDuration += rate.Duration
+		if elapsed <= aggregateDuration {
+			activeRate = rate
+			break
+		}
+	}
+
+	// Use the last rate if we didn't find one
+	if activeRate == (RateDescriptor{}) {
+		activeRate = pacer.Attack.Rates[len(pacer.Attack.Rates)-1]
+		fmt.Printf("🔥  Setting default rate of %d req/sec for remainder of attack\n", activeRate.Rate)
+	}
+
+	// Report when the rate changes
+	if activePacerState.Rate != activeRate {
+		if activePacerState.Metrics.Requests > 0 {
+			activePacerState.Metrics.Close()
+			reporter := vegeta.NewTextReporter(&activePacerState.Metrics)
+			reporter.Report(os.Stdout)
+			activePacerState.Metrics = vegeta.Metrics{}
+		}
+
+		activePacerState.Rate = activeRate
+		elapsedSummary := func() string {
+			if uint64(elapsed.Seconds()) > 0 {
+				return fmt.Sprintf(" (%v elapsed)", round(elapsed))
+			}
+			return ""
+		}
+		fmt.Printf("💥  Attacking at a rate of %v%s\n", activeRate, elapsedSummary())
+	}
+	expectedHits := pacer.hits(elapsed, activeRate)
+
+	// Calculate when to send the next hit based on the active rate
+	if hits == 0 || hits < uint64(expectedHits) {
+		// Running behind, send next hit immediately.
+		return 0, false
+	}
+
+	// rate := p.rate(elapsed)
+	interval := math.Round(1e9 / float64(pacer.rate(elapsed, activeRate)))
+
+	if n := uint64(interval); n != 0 && math.MaxInt64/n < hits {
+		// We would overflow wait if we continued, so stop the attack.
+		return 0, true
+	}
+
+	delta := float64(hits+1) - expectedHits
+	wait := time.Duration(interval * delta)
+
+	return wait, false
+
+	// nsPerHit := math.Round(1 / pacer.hitsPerNs(activeRate))
+	// hitsToWait := float64(hits+1) - float64(expectedHits)
+	// nextHitIn := time.Duration(nsPerHit * hitsToWait)
+	// return nextHitIn, false
+
+	// TODO:
+	// Find your current rate
+	// Find that rate you might be chasing
+	// Check if duration is >= your aggregate duration, then start chasing the next one
+}
+
+func (rs RateDescriptor) hitsPerNs() float64 {
+	return float64(rs.Rate) / float64(rs.Duration)
+}
+
+// hits returns the number of hits that have been sent during an attack
+// lasting t nanoseconds. It returns a float so we can tell exactly how
+// much we've missed our target by when solving numerically in Pace.
+func (pacer CurveFittingPacer) hits(t time.Duration, rate RateDescriptor) float64 {
+	if t < 0 {
+		return 0
+	}
+
+	// TODO: Iterate across the rates and accumulate
+	a := pacer.Slope
+	// TODO: Average out the number hits across the windows?
+	b := rate.hitsPerNs() * 1e9
+	x := t.Seconds()
+
+	return (a*math.Pow(x, 2))/2 + b*x
+}
+
+// rate calculates the instantaneous rate of attack at
+// t nanoseconds after the attack began.
+func (pacer CurveFittingPacer) rate(t time.Duration, rate RateDescriptor) float64 {
+	a := pacer.Slope
+	x := t.Seconds()
+	b := rate.hitsPerNs() * 1e9
+	return a*x + b
+}
+
+// // TODO: Move to RateDescriptor type
+// func (pacer CurveFittingPacer) hitsPerNs(rate RateDescriptor) float64 {
+// 	return float64(rate.Rate) / float64(time.Second)
+// }
+
+// // TODO: Move to RateDescriptor type
+// func (pacer CurveFittingPacer) hits(duration time.Duration) float64 {
+// 	hits := float64(0)
+// 	aggregateDuration := time.Second
+// 	for _, rate := range pacer.Attack.Rates {
+// 		hits += (float64(rate.Rate) * rate.Duration.Seconds())
+// 		aggregateDuration += rate.Duration
+// 		if duration <= aggregateDuration {
+// 			break
+// 		}
+// 	}
+// 	return hits
+// }
+
+func (pacer CurveFittingPacer) durationForRatesLen(l int) time.Duration {
+	return time.Second * time.Duration(math.Ceil(float64(pacer.Duration)/float64(l)))
+}
+
+func (pacer CurveFittingPacer) parsePacingCSV(csv *csv.Reader) []RateDescriptor {
+	var rates []RateDescriptor
+	for {
+		line, err := csv.Read()
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			log.Fatal(err)
+		}
+
+		rate, err := strconv.Atoi(line[0])
+		if err != nil {
+			log.Fatal(err)
+		}
+		rates = append(rates, RateDescriptor{
+			Rate: uint(rate),
+		})
+	}
+
+	// Split the total duration amongst our rate descriptors
+	duration := pacer.durationForRatesLen(len(rates))
+	for _, rate := range rates {
+		rate.Duration = duration
+	}
+
+	return rates
+}
+
+// parsePacingStr parses a string of the form "rate1, rate2"... into an array of rate descriptors
+func (pacer CurveFittingPacer) parsePacingStr(pacing string) []RateDescriptor {
+	var rates []RateDescriptor
+	descriptors := strings.SplitN(pacing, ",", -1)
+	duration := pacer.durationForRatesLen(len(descriptors))
+	for _, descriptor := range descriptors {
+		rate, err := strconv.Atoi(strings.TrimSpace(descriptor))
+		if err != nil {
+			msg := fmt.Errorf("invalid pacing descriptor %q: %s", pacing, err)
+			log.Fatal(msg)
+		}
+		rates = append(rates, RateDescriptor{
+			Rate:     uint(rate),
+			Duration: duration,
+		})
+	}
+	return rates
+}
+
+func (pacer *CurveFittingPacer) setAttack(attack AttackDescriptor) {
+	pacer.Attack = attack
+}
+
 /**
 CLI interface
 **/
@@ -241,15 +427,19 @@ type paceOpts struct {
 }
 
 func main() {
+	const StepFunctionArg = "step-function"
+	const CurveFittingArg = "curve-fitting"
+
+	var PacerArgs = []string{StepFunctionArg, CurveFittingArg}
+
 	// Parse the commandline options
-	pacers := []string{"step-function", "curve-fitting"}
 	opts := paceOpts{}
 	flag.StringVar(&opts.url, "url", "http://localhost:8080/", "The URL to attack")
 	flag.StringVar(&opts.pacer, "pacer", "",
-		fmt.Sprintf("Pacer to use for governing load rate [%s]", strings.Join(pacers, ", ")))
+		fmt.Sprintf("Pacer to use for governing load rate [%s]", strings.Join(PacerArgs, ", ")))
 	flag.StringVar(&opts.pacing, "pacing", "", "String describing the pace")
 	flag.StringVar(&opts.file, "file", "", "CSV file describing the pace")
-	flag.DurationVar(&opts.duration, "duration", 0, "Duration of the test. Required when pacer is \"curve-fitting\"")
+	flag.DurationVar(&opts.duration, "duration", 0, fmt.Sprintf("Duration of the test. Required when pacer is %q", CurveFittingArg))
 	flag.Parse()
 
 	if len(os.Args) == 1 {
@@ -273,11 +463,15 @@ func main() {
 
 	var pacer dynamicPacer
 	switch opts.pacer {
-	case "step-function":
+	case StepFunctionArg:
 		pacer = &StepFunctionPacer{}
-	case "cuve-fitting":
-		err := fmt.Errorf("curve-fitting is not yet implemented")
-		log.Fatal(err)
+	case CurveFittingArg:
+		if opts.duration <= 0 {
+			err := fmt.Errorf("%q pacer requires a -duration be provided", opts.pacer)
+			log.Fatal(err)
+		}
+		fmt.Printf("Configuring with duration: %v", opts.duration)
+		pacer = &CurveFittingPacer{Duration: opts.duration, Slope: 1}
 	default:
 		err := fmt.Errorf("unknown pacer type: %q", opts.pacer)
 		log.Fatal(err)
