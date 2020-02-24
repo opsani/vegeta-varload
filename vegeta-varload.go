@@ -28,22 +28,14 @@ type RateDescriptor struct {
 }
 
 func (rs RateDescriptor) String() string {
-	return fmt.Sprintf("%v req/s for %v", rs.Rate, rs.Duration)
+	return fmt.Sprintf("%v req/s for %v", rs.Rate, round(rs.Duration))
 }
 
 // AttackDescriptor describes an attack by name and series of rates.
 type AttackDescriptor struct {
-	Name  string           `json:"name"`
-	Rates []RateDescriptor `json:"rates"`
-}
-
-// Duration returns the aggregate time in an attack by summing all the duration of the rates.
-func (attack AttackDescriptor) Duration() time.Duration {
-	duration := time.Second
-	for _, rate := range attack.Rates {
-		duration += rate.Duration
-	}
-	return duration
+	Name     string           `json:"name"`
+	Duration time.Duration    `json:"duration"`
+	Rates    []RateDescriptor `json:"rates"`
 }
 
 // dynamicPacer defines the abstract interface for pacers the can build attack plans from CSV files or strings.
@@ -149,12 +141,10 @@ func (pacer StepFunctionPacer) Pace(elapsed time.Duration, hits uint64) (time.Du
 	return nextHitIn, false
 }
 
-// TODO: Move to RateDescriptor type
 func (pacer StepFunctionPacer) hitsPerNs(rate RateDescriptor) float64 {
 	return float64(rate.Rate) / float64(time.Second)
 }
 
-// TODO: Move to RateDescriptor type
 func (pacer StepFunctionPacer) hits(duration time.Duration) float64 {
 	hits := float64(0)
 	aggregateDuration := time.Second
@@ -339,27 +329,8 @@ func (pacer CurveFittingPacer) rate(t time.Duration, rate RateDescriptor) float6
 	return a*x + b
 }
 
-// // TODO: Move to RateDescriptor type
-// func (pacer CurveFittingPacer) hitsPerNs(rate RateDescriptor) float64 {
-// 	return float64(rate.Rate) / float64(time.Second)
-// }
-
-// // TODO: Move to RateDescriptor type
-// func (pacer CurveFittingPacer) hits(duration time.Duration) float64 {
-// 	hits := float64(0)
-// 	aggregateDuration := time.Second
-// 	for _, rate := range pacer.Attack.Rates {
-// 		hits += (float64(rate.Rate) * rate.Duration.Seconds())
-// 		aggregateDuration += rate.Duration
-// 		if duration <= aggregateDuration {
-// 			break
-// 		}
-// 	}
-// 	return hits
-// }
-
 func (pacer CurveFittingPacer) durationForRatesLen(l int) time.Duration {
-	return time.Second * time.Duration(math.Ceil(float64(pacer.Duration)/float64(l)))
+	return time.Duration(math.Ceil(float64(pacer.Duration) / float64(l)))
 }
 
 func (pacer CurveFittingPacer) parsePacingCSV(csv *csv.Reader) []RateDescriptor {
@@ -461,6 +432,8 @@ func main() {
 		log.Fatal(err)
 	}
 
+	var attack AttackDescriptor
+	attack.Name = "Variable Load Test"
 	var pacer dynamicPacer
 	switch opts.pacer {
 	case StepFunctionArg:
@@ -470,16 +443,14 @@ func main() {
 			err := fmt.Errorf("%q pacer requires a -duration be provided", opts.pacer)
 			log.Fatal(err)
 		}
-		fmt.Printf("Configuring with duration: %v", opts.duration)
 		pacer = &CurveFittingPacer{Duration: opts.duration, Slope: 1}
+		attack.Duration = opts.duration
 	default:
 		err := fmt.Errorf("unknown pacer type: %q", opts.pacer)
 		log.Fatal(err)
 	}
 
-	// Build the attack
-	var attack AttackDescriptor
-	attack.Name = "Variable Load Test"
+	// Build the attack	v
 	if opts.file != "" {
 		csvFile, err := os.Open(opts.file)
 		if err != nil {
@@ -490,17 +461,25 @@ func main() {
 	} else if opts.pacing != "" {
 		attack.Rates = pacer.parsePacingStr(opts.pacing)
 	}
+	// TODO: Temporary hack
+	if attack.Duration == 0 {
+		duration := time.Second
+		for _, rate := range attack.Rates {
+			duration += rate.Duration
+		}
+		attack.Duration = duration
+	}
 	pacer.setAttack(attack)
 
 	// Run the attack
-	fmt.Printf("🚀  Starting variable load test against %q with %d load profiles for %v\n", opts.url, len(attack.Rates), round(attack.Duration()))
+	fmt.Printf("🚀  Starting variable load test against %q with %d load profiles for %v\n", opts.url, len(attack.Rates), round(attack.Duration))
 	targeter := vegeta.NewStaticTargeter(vegeta.Target{
 		Method: "GET",
 		URL:    opts.url,
 	})
 	attacker := vegeta.NewAttacker()
 	startedAt := time.Now()
-	for res := range attacker.Attack(targeter, pacer, attack.Duration(), attack.Name) {
+	for res := range attacker.Attack(targeter, pacer, attack.Duration, attack.Name) {
 		activePacerState.Metrics.Add(res)
 	}
 
