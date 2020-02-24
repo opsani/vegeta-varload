@@ -1,11 +1,13 @@
 # Vegeta Variable Load Testing
 
-This repository contains an example of running a multi-rate load test using [Vegeta](https://github.com/tsenart/vegeta)
-as a library. This implements a variable load testing utility without any forking or modification of existing project code bases.
+This repository contains variable rate load testing utility built on top of [Vegeta](https://github.com/tsenart/vegeta). It is capable of delivering varying load levels to an application under test by providing a set of implementations of the [`vegeta.Pacer`](https://github.com/tsenart/vegeta/blob/master/lib/pacer.go) interface. Pacer implementations govern the load rate by determining when the next request should be sent -- allowing for the acceleration or deceleration of the request rate based on arbitrary logic.
 
-The utility will run an attack on a target URL (default of http://localhost:8080/) using the rate patterns defined in the `attack.csv` file.
+### Pacers
 
-This code was adapted from a 2017 article on Josh Barrats blog: https://serialized.net/2017/06/load-testing-with-vegeta-and-python/
+There are currently two pacers provided:
+
+* `step-function`: Models a load in which the load oscillates between target rates at specific durations. For example, you may deliver a load of 50 req/s for 10 seconds, followed by 150 req/s for 25 seconds, and so on. The acceleration and deceleration curve between rates is as aggressive as possible and the total test duration is defined by the sum of all step durations.
+* `curve-fitting`: Models a load in which the load is described by a set of rates and a total duration of the test. The pacer will accelerate and decelerate between the data points to construct a load curve that is the best fit for the data points.
 
 ## Usage
 
@@ -117,6 +119,10 @@ $ docker-compose logs -f vegeta
 ```console
 $ docker-compose run vegeta https://www.opsani.com/
 ```
+
+## Acknowledgements
+
+This code was originally adapted from a 2017 article on Josh Barrats blog: https://serialized.net/2017/06/load-testing-with-vegeta-and-python/
 
 ## License
 
