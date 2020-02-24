@@ -24,7 +24,7 @@ type RateDescriptor struct {
 }
 
 func (rs RateDescriptor) String() string {
-	return fmt.Sprintf("%vreq/s for %v", rs.Rate, rs.Duration)
+	return fmt.Sprintf("%v req/s for %v", rs.Rate, rs.Duration)
 }
 
 // AttackDescriptor describes an attack by name and series of rates.
@@ -99,7 +99,7 @@ func (pacer StepFunctionPacer) Pace(elapsed time.Duration, hits uint64) (time.Du
 	// Use the last rate if we didn't find one
 	if activeRate == (RateDescriptor{}) {
 		activeRate = pacer.Attack.Rates[len(pacer.Attack.Rates)-1]
-		fmt.Printf("🔥  Setting default rate of %dreq/sec for remainder of attack\n", activeRate.Rate)
+		fmt.Printf("🔥  Setting default rate of %d req/sec for remainder of attack\n", activeRate.Rate)
 	}
 
 	// Report when the rate changes
@@ -133,10 +133,12 @@ func (pacer StepFunctionPacer) Pace(elapsed time.Duration, hits uint64) (time.Du
 	return nextHitIn, false
 }
 
+// TODO: Move to RateDescriptor type
 func (pacer StepFunctionPacer) hitsPerNs(rate RateDescriptor) float64 {
 	return float64(rate.Rate) / float64(time.Second)
 }
 
+// TODO: Move to RateDescriptor type
 func (pacer StepFunctionPacer) hits(duration time.Duration) float64 {
 	hits := float64(0)
 	aggregateDuration := time.Second
@@ -203,13 +205,15 @@ func (pacer StepFunctionPacer) parsePacingStr(pacing string) []RateDescriptor {
 			log.Fatal(msg)
 		}
 
-		rate, err := strconv.Atoi(strings.TrimSpace(components[0]))
+		duration, err := time.ParseDuration(strings.TrimSpace(components[0]))
 		if err != nil {
-			log.Fatal(err)
+			msg := fmt.Errorf("invalid pacing descriptor %q: %s", pacing, err)
+			log.Fatal(msg)
 		}
-		duration, err := time.ParseDuration(strings.TrimSpace(components[1]))
+		rate, err := strconv.Atoi(strings.TrimSpace(components[1]))
 		if err != nil {
-			log.Fatal(err)
+			msg := fmt.Errorf("invalid pacing descriptor %q: %s", pacing, err)
+			log.Fatal(msg)
 		}
 		rates = append(rates, RateDescriptor{
 			Rate:     uint(rate),
@@ -229,7 +233,7 @@ func main() {
 	opts := paceOpts{}
 	flag.StringVar(&opts.url, "url", "http://localhost:8080/", "The URL to attack")
 	flag.StringVar(&opts.pacer, "pacer", "",
-		fmt.Sprintf("Pacer [%s]", strings.Join(pacers, ", ")))
+		fmt.Sprintf("Pacer to use for governing load rate [%s]", strings.Join(pacers, ", ")))
 	flag.StringVar(&opts.pacing, "pacing", "", "String describing the pace")
 	flag.StringVar(&opts.file, "file", "", "CSV file describing the pace")
 	flag.DurationVar(&opts.duration, "duration", 0, "Duration of the test. Required when pacer is \"curve-fitting\"")
@@ -259,7 +263,8 @@ func main() {
 	case "step-function":
 		pacer = &StepFunctionPacer{}
 	case "cuve-fitting":
-		// TODO
+		err := fmt.Errorf("curve-fitting is not yet implemented")
+		log.Fatal(err)
 	default:
 		err := fmt.Errorf("unknown pacer type: %q", opts.pacer)
 		log.Fatal(err)
@@ -281,7 +286,7 @@ func main() {
 	pacer.setAttack(attack)
 
 	// Run the attack
-	fmt.Printf("🚀  Starting variable load test against %s with %d load profiles for %v\n", opts.url, len(attack.Rates), round(attack.Duration()))
+	fmt.Printf("🚀  Starting variable load test against %q with %d load profiles for %v\n", opts.url, len(attack.Rates), round(attack.Duration()))
 	targeter := vegeta.NewStaticTargeter(vegeta.Target{
 		Method: "GET",
 		URL:    opts.url,
@@ -298,5 +303,5 @@ func main() {
 	reporter.Report(os.Stdout)
 
 	attackDuration := time.Since(startedAt)
-	fmt.Printf("✨  Variable load test against %s completed in %v\n", opts.url, round(attackDuration))
+	fmt.Printf("✨  Variable load test against %q completed in %v\n", opts.url, round(attackDuration))
 }

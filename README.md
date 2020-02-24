@@ -7,10 +7,27 @@ The utility will run an attack on a target URL (default of http://localhost:8080
 
 This code was adapted from a 2017 article on Josh Barrats blog: https://serialized.net/2017/06/load-testing-with-vegeta-and-python/
 
+## Usage
+
+```console
+$ ./vegeta-varload --help
+Usage of vegeta-varload:
+  -duration duration
+    	Duration of the test. Required when pacer is "curve-fitting"
+  -file string
+    	CSV file describing the pace
+  -pacer string
+    	Pacer to use for governing load rate [step-function, curve-fitting]
+  -pacing string
+    	String describing the pace
+  -url string
+    	The URL to attack (default "http://localhost:8080/")
+```
+
 ## Example Output
 
 ```console
-$ go run vegeta-varload.go https://www.opsani.com/
+$ go run vegeta-varload.go --url https://www.opsani.com/ --pacer step-function --file attack.csv
 🚀  Starting variable load test against https://www.opsani.com/ with 6 load profiles for 44 total seconds
 💥  Attacking at rate of 10 req/sec for 5s
 Requests      [total, rate, throughput]         59, 9.99, 9.87
@@ -83,7 +100,7 @@ A Dockerfile is provided that can be used to run the load test
 
 ```console
 $ docker build -t vegeta-varload .
-$ docker run -ti vegeta-varload https://www.opsani.com/
+$ docker run -ti vegeta-varload --url https://www.opsani.com/ --pacer step-function --pacing "10s@15, 1m@20"
 ```
 
 ## Running via Docker Compose

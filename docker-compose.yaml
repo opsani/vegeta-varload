@@ -4,7 +4,7 @@ services:
     vegeta:
         build:
             context: .
-        entrypoint: /root/vegeta-varload http://nginx/
+        entrypoint: /root/vegeta-varload --url http://nginx/ --pacer step-function --file attack.csv
     
     nginx:
         image: nginx
