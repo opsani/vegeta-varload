@@ -192,9 +192,30 @@ func (pacer StepFunctionPacer) parsePacingCSV(csv *csv.Reader) []RateDescriptor 
 	return rates
 }
 
+// parsePacingStr parses a string of the form "duration1@rate1, duration2@rate2"... into an array of rate descriptors
 func (pacer StepFunctionPacer) parsePacingStr(pacing string) []RateDescriptor {
-	// TODO: Parse a two dimensional string
 	var rates []RateDescriptor
+	descriptors := strings.SplitN(pacing, ",", -1)
+	for _, descriptor := range descriptors {
+		components := strings.SplitN(descriptor, "@", 2)
+		if components[0] == "" || components[1] == "" {
+			msg := fmt.Errorf("invalid pacing descriptor %q", pacing)
+			log.Fatal(msg)
+		}
+
+		rate, err := strconv.Atoi(strings.TrimSpace(components[0]))
+		if err != nil {
+			log.Fatal(err)
+		}
+		duration, err := time.ParseDuration(strings.TrimSpace(components[1]))
+		if err != nil {
+			log.Fatal(err)
+		}
+		rates = append(rates, RateDescriptor{
+			Rate:     uint(rate),
+			Duration: duration,
+		})
+	}
 	return rates
 }
 
@@ -228,6 +249,9 @@ func main() {
 	if opts.file == "" && opts.pacing == "" {
 		err := fmt.Errorf("-file or -pacing must be provided")
 		log.Fatal(err)
+	} else if opts.file != "" && opts.pacing != "" {
+		err := fmt.Errorf("-file and -pacing cannot both be provided")
+		log.Fatal(err)
 	}
 
 	var pacer dynamicPacer
@@ -252,6 +276,7 @@ func main() {
 		csv := csv.NewReader(bufio.NewReader(csvFile))
 		attack.Rates = pacer.parsePacingCSV(csv)
 	} else if opts.pacing != "" {
+		attack.Rates = pacer.parsePacingStr(opts.pacing)
 	}
 	pacer.setAttack(attack)
 
